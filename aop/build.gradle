@@ -1,0 +1,72 @@
+import org.aspectj.bridge.IMessage
+import org.aspectj.bridge.MessageHandler
+import org.aspectj.tools.ajc.Main
+
+apply plugin: 'com.android.library'
+
+android {
+    compileSdkVersion 25
+    buildToolsVersion "25.0.2"
+    lintOptions {
+        abortOnError false
+    }
+}
+buildscript{
+    repositories{
+        mavenCentral()
+    }
+    dependencies{
+        classpath 'com.android.tools.build:gradle:2.2.3'
+        classpath 'org.aspectj:aspectjtools:1.8.1'
+    }
+}
+
+repositories{
+    mavenCentral()
+}
+
+
+dependencies {
+    compile 'org.aspectj:aspectjrt:1.8.1'
+}
+/**
+ * @使用ajc编译java代码 ， 同 时 织 入 切 片 代 码
+ * 使用 AspectJ 的编译器（ajc，一个java编译器的扩展）
+ * 对所有受 aspect 影响的类进行织入。
+ * 在 gradle 的编译 task 中增加额外配置，使之能正确编译运行。
+ */
+android.libraryVariants.all { variant ->
+    JavaCompile javaCompile = variant.javaCompile
+    javaCompile.doLast {
+        String[] args = [
+                "-showWeaveInfo",
+                "-1.5",
+                "-inpath", javaCompile.destinationDir.toString(),
+                "-aspectpath", javaCompile.classpath.asPath,
+                "-d", javaCompile.destinationDir.toString(),
+                "-classpath", javaCompile.classpath.asPath,
+                "-bootclasspath", android.bootClasspath.join(File.pathSeparator)
+        ]
+
+        MessageHandler handler = new MessageHandler(true);
+        new Main().run(args, handler)
+
+        def log = project.logger
+        for (IMessage message : handler.getMessages(null, true)) {
+            switch (message.getKind()) {
+                case IMessage.ABORT:
+                case IMessage.ERROR:
+                case IMessage.FAIL:
+                    log.error message.message, message.thrown
+                    break;
+                case IMessage.WARNING:
+                case IMessage.INFO:
+                    log.info message.message, message.thrown
+                    break;
+                case IMessage.DEBUG:
+                    log.debug message.message, message.thrown
+                    break;
+            }
+        }
+    }
+}
